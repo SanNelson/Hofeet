@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hofeet - Gameterapia para Pie Equinovaro</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = { theme: { extend: {
+  colors: {
+    brand: { 50:'#f0f9ff',100:'#e0f2fe',500:'#0284c7',600:'#0369a1',700:'#075985' },
+    bamboo: { 100:'#dcfce7',200:'#bbf7d0',400:'#4ade80',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534' },
+    accent: { 500:'#f59e0b',600:'#d97706' }
+  },
+  fontFamily: { kids:['Fredoka','sans-serif'], clinical:['Plus Jakarta Sans','sans-serif'] }
+}}}
+</script>
+<style>
+.custom-scrollbar::-webkit-scrollbar{width:6px;height:6px}
+.custom-scrollbar::-webkit-scrollbar-track{background:#f1f5f9}
+.custom-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-8px) rotate(2deg)}}
+@keyframes jump{0%{transform:translateY(0) scale(1)}40%{transform:translateY(-40px) scale(1.1)}100%{transform:translateY(0) scale(1)}}
+.animate-float{animation:float 3s ease-in-out infinite}
+.animate-jump{animation:jump .5s cubic-bezier(.175,.885,.32,1.275)}
+input[type=range]{accent-color:#16a34a;width:100%}
+@media (prefers-reduced-motion:reduce){.animate-float,.animate-jump{animation:none}}
+</style>
+</head>
+<body class="h-full flex flex-col font-clinical text-slate-800 antialiased select-none">
+
+<header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-bamboo-600 to-brand-500 flex items-center justify-center text-white font-kids font-bold text-xl shadow-md">H</div>
+        <div>
+          <span class="font-kids font-bold text-xl tracking-wide bg-gradient-to-r from-bamboo-700 to-brand-600 bg-clip-text text-transparent">Hofeet</span>
+          <span class="hidden sm:inline-block text-xs font-semibold px-2 py-0.5 ml-2 bg-bamboo-100 text-bamboo-700 rounded-full">Bam-boo! v1.2</span>
+        </div>
+      </div>
+      <nav class="flex items-center bg-slate-100 p-1 rounded-xl gap-1 border border-slate-200">
+        <button id="tab-patient" onclick="switchView('patient')" class="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 bg-white text-bamboo-700 shadow-sm">
+          <i class="fa-solid fa-gamepad text-base"></i><span class="font-kids tracking-wide">Juego Niño</span>
+        </button>
+        <button id="tab-therapist" onclick="switchView('therapist')" class="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-user-doctor text-base"></i><span>Fisioterapeuta</span>
+        </button>
+      </nav>
+      <div class="flex items-center gap-2">
+        <button id="sim-toggle-btn" onclick="toggleHardwareSim()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+          <span id="sim-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+          <span class="hidden md:inline">Simulador Hardware</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div id="sim-toolbar" class="hidden bg-slate-900 text-slate-200 text-xs py-2 px-4 border-b border-slate-800">
+  <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="font-bold text-amber-400 flex items-center gap-1"><i class="fa-solid fa-microchip"></i> Telemetría MPU6050 + Velostat:</span>
+      <span class="bg-slate-800 px-2 py-0.5 rounded font-mono">Dorsiflexión: <span id="sim-val-dorsi" class="text-emerald-400">0°</span></span>
+      <span class="bg-slate-800 px-2 py-0.5 rounded font-mono">Eversión: <span id="sim-val-ever" class="text-sky-400">0°</span></span>
+      <span class="bg-slate-800 px-2 py-0.5 rounded font-mono">Presión Máx: <span id="sim-val-press" class="text-amber-400">0 kPa</span></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-slate-400">Generador Automático de Ruido:</span>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" id="sim-auto-noise" onchange="toggleAutoNoise(this.checked)" class="sr-only peer">
+        <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-bamboo-500"></div>
+      </label>
+    </div>
+  </div>
+</div>
+
+<main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 custom-scrollbar overflow-y-auto">
+
+<!-- ================= VISTA NIÑO ================= -->
+<section id="view-patient" class="space-y-6">
+  <div class="bg-gradient-to-b from-sky-300 via-sky-100 to-bamboo-100 rounded-3xl border-4 border-white shadow-xl overflow-hidden relative">
+    <div class="p-4 sm:p-6 flex items-center justify-between gap-2 z-10 relative">
+      <div class="flex items-center gap-3 bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/60 shadow-sm">
+        <div class="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center text-xl border-2 border-white shadow-sm">👦</div>
+        <div>
+          <h3 id="patient-name-label" class="font-kids font-bold text-slate-800 text-sm sm:text-base leading-tight">Jugador</h3>
+          <button onclick="openNameModal()" class="text-xs text-brand-600 font-semibold underline">Cambiar jugador</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/60 shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-rotate-right text-brand-500"></i>
+          <div><p class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Reps</p>
+          <p id="game-rep-count" class="font-kids font-bold text-lg text-slate-800 leading-none">0 / 10</p></div>
+        </div>
+        <div class="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/60 shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-star text-amber-400 text-lg"></i>
+          <div><p class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Estrellas</p>
+          <p id="game-stars" class="font-kids font-bold text-lg text-amber-600 leading-none">0</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="game-stage" class="h-64 sm:h-80 w-full relative flex items-end justify-between px-8 sm:px-16 pb-8 overflow-hidden">
+      <div class="absolute top-6 left-12 opacity-80 animate-float" style="animation-duration:6s"><i class="fa-solid fa-cloud text-white text-5xl"></i></div>
+      <div class="absolute top-12 right-20 opacity-70 animate-float" style="animation-duration:4s"><i class="fa-solid fa-cloud text-white text-4xl"></i></div>
+      <div class="absolute top-4 left-1/2 opacity-90 animate-float" style="animation-duration:5s"><i class="fa-solid fa-sun text-amber-300 text-6xl"></i></div>
+      <div class="absolute bottom-0 left-0 right-0 h-16 bg-bamboo-600 rounded-t-3xl border-t-4 border-bamboo-400 flex justify-around items-end opacity-90">
+        <div class="w-4 h-24 bg-bamboo-500 rounded-t-md border-r-2 border-bamboo-700"></div>
+        <div class="w-6 h-32 bg-bamboo-500 rounded-t-md border-r-2 border-bamboo-700"></div>
+        <div class="w-5 h-20 bg-bamboo-500 rounded-t-md border-r-2 border-bamboo-700"></div>
+        <div class="w-6 h-28 bg-bamboo-500 rounded-t-md border-r-2 border-bamboo-700"></div>
+      </div>
+
+      <div id="panda-character" class="z-10 transition-transform duration-200 relative">
+        <div class="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center">
+          <div id="panda-emoji" class="text-7xl sm:text-8xl drop-shadow-lg" style="transform:scaleX(-1)">🐼</div>
+          <div id="praise-bubble" class="opacity-0 transition-opacity duration-300 absolute -top-8 left-1/2 -translate-x-1/2 bg-amber-300 text-amber-950 font-kids font-bold px-3 py-1 rounded-full text-xs shadow-md whitespace-nowrap">¡Excelente movimiento! 🎉</div>
+        </div>
+      </div>
+
+      <div id="target-bamboo" class="z-10 relative flex flex-col items-center">
+        <div class="w-8 h-40 sm:h-48 bg-gradient-to-r from-bamboo-500 via-bamboo-400 to-bamboo-600 rounded-t-lg border-2 border-bamboo-700 flex flex-col justify-between py-2 shadow-md">
+          <div class="w-full h-1 bg-bamboo-700/40"></div><div class="w-full h-1 bg-bamboo-700/40"></div><div class="w-full h-1 bg-bamboo-700/40"></div>
+        </div>
+        <span class="font-kids font-bold text-bamboo-800 text-xs mt-1 bg-white/70 px-2 py-0.5 rounded-full">¡Meta!</span>
+      </div>
+    </div>
+
+    <div class="px-6 py-3 bg-white/90 border-t border-bamboo-200/50 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <i class="fa-solid fa-bullseye text-bamboo-600"></i>
+        <span class="text-xs font-bold text-slate-700 font-kids">Objetivo Actual:</span>
+        <span id="current-exercise-label" class="text-xs font-bold text-brand-600 bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-100">Dorsiflexión ≥ 15°</span>
+      </div>
+      <div class="w-full sm:w-64 bg-slate-200 h-3 rounded-full overflow-hidden">
+        <div id="exercise-progress-bar" class="bg-gradient-to-r from-bamboo-400 to-bamboo-600 h-full w-0 transition-all duration-200 rounded-full"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controles de sensores simulados -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-arrows-up-down"></i></div>
+          <h4 class="font-bold text-sm">Dorsiflexión (Arriba)</h4>
+        </div>
+        <span id="lbl-dorsi" class="font-kids font-bold text-brand-600">0°</span>
+      </div>
+      <input type="range" id="in-dorsi" min="0" max="30" value="0" oninput="onSensorInput()" aria-label="Dorsiflexión en grados">
+      <p class="text-xs text-slate-500">Levanta la punta del pie hacia la espinilla.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center"><i class="fa-solid fa-arrows-left-right"></i></div>
+          <h4 class="font-bold text-sm">Eversión (Afuera)</h4>
+        </div>
+        <span id="lbl-ever" class="font-kids font-bold text-sky-600">0°</span>
+      </div>
+      <input type="range" id="in-ever" min="0" max="25" value="0" oninput="onSensorInput()" aria-label="Eversión en grados">
+      <p class="text-xs text-slate-500">Gira la planta del pie hacia afuera.</p>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-amber-100 text-accent-600 flex items-center justify-center"><i class="fa-solid fa-shoe-prints"></i></div>
+          <h4 class="font-bold text-sm">Apoyo (Presión)</h4>
+        </div>
+        <span id="lbl-press" class="font-kids font-bold text-accent-600">0 kPa</span>
+      </div>
+      <input type="range" id="in-press" min="0" max="100" value="0" oninput="onSensorInput()" aria-label="Presión en kPa">
+      <p class="text-xs text-slate-500">Apoya el talón y la planta en el suelo.</p>
+    </div>
+  </div>
+
+  <!-- Selector de ejercicio -->
+  <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center gap-2">
+    <span class="text-xs font-bold text-slate-600 mr-2">Ejercicio:</span>
+    <button data-ex="0" onclick="setExercise(0)" class="ex-btn px-3 py-1.5 rounded-lg text-xs font-semibold border">Dorsiflexión</button>
+    <button data-ex="1" onclick="setExercise(1)" class="ex-btn px-3 py-1.5 rounded-lg text-xs font-semibold border">Eversión</button>
+    <button data-ex="2" onclick="setExercise(2)" class="ex-btn px-3 py-1.5 rounded-lg text-xs font-semibold border">Apoyo</button>
+    <button onclick="resetSession()" class="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 hover:bg-slate-50"><i class="fa-solid fa-rotate-left mr-1"></i>Reiniciar sesión</button>
+  </div>
+</section>
+
+<!-- ================= VISTA FISIOTERAPEUTA ================= -->
+<section id="view-therapist" class="hidden space-y-6">
+  <div id="therapist-lock" class="hidden max-w-sm mx-auto bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3 text-center">
+    <i class="fa-solid fa-lock text-2xl text-brand-600"></i>
+    <h3 class="font-bold">Zona del fisioterapeuta</h3>
+    <p class="text-xs text-slate-500">Escribe tu código para ver los datos de los pacientes.</p>
+    <input id="lock-input" type="password" autocomplete="off" aria-label="Código del fisioterapeuta" class="select-text w-full px-3 py-2 rounded-lg border border-slate-300 text-center" onkeydown="if(event.key==='Enter')unlockTherapist()">
+    <p id="lock-error" class="text-sm text-red-600"></p>
+    <button onclick="unlockTherapist()" class="w-full py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold">Entrar</button>
+  </div>
+  <div id="therapist-content" class="space-y-6">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm"><label for="patient-select" class="text-xs text-slate-500 font-semibold">Paciente</label><select id="patient-select" onchange="renderTherapist(false)" class="mt-1 w-full font-bold bg-transparent border-b border-slate-300 outline-none"></select></div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm"><p class="text-xs text-slate-500 font-semibold">Sesiones</p><p id="kpi-sessions" class="font-bold text-2xl text-brand-600">0</p></div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm"><p class="text-xs text-slate-500 font-semibold">Dorsiflexión máx. reciente</p><p id="kpi-dorsi" class="font-bold text-2xl text-bamboo-600">0°</p></div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm"><p class="text-xs text-slate-500 font-semibold">Repeticiones totales</p><p id="kpi-reps" class="font-bold text-2xl text-accent-600">0</p></div>
+  </div>
+
+  <div id="charts-wrap" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+      <h4 class="font-bold text-sm mb-3">Rango de movimiento por sesión (°)</h4>
+      <div class="h-64"><canvas id="chart-rom"></canvas></div>
+    </div>
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+      <h4 class="font-bold text-sm mb-3">Presión máxima por sesión (kPa)</h4>
+      <div class="h-64"><canvas id="chart-press"></canvas></div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+    <h4 class="font-bold text-sm mb-3">Historial de sesiones (la tabla completa está en tu hoja de Google)</h4>
+    <div class="overflow-x-auto custom-scrollbar">
+      <table class="w-full text-sm text-left">
+        <thead class="text-xs text-slate-500 border-b border-slate-200">
+          <tr><th class="py-2 pr-4">Fecha</th><th class="pr-4">Paciente</th><th class="pr-4">Ejercicio</th><th class="pr-4">Reps</th><th class="pr-4">Dorsiflexión</th><th class="pr-4">Eversión</th><th>Presión</th></tr>
+        </thead>
+        <tbody id="session-table"></tbody>
+      </table>
+    </div>
+  </div>
+  </div>
+</section>
+
+</main>
+
+<div id="name-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+  <div class="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl space-y-4">
+    <div class="text-center"><div class="text-6xl">🐼</div><h2 class="font-kids font-bold text-2xl text-bamboo-700">¡Hola! ¿Cómo te llamas?</h2></div>
+    <input id="name-input" list="patient-list" maxlength="60" autocomplete="off" placeholder="Escribe tu nombre" class="select-text w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-bamboo-500 outline-none font-kids text-lg" onkeydown="if(event.key==='Enter')startPlayer()">
+    <datalist id="patient-list"></datalist>
+    <p id="name-error" class="hidden text-sm text-red-600">Escribe un nombre para empezar.</p>
+    <button onclick="startPlayer()" class="w-full py-3 rounded-xl bg-bamboo-600 hover:bg-bamboo-700 text-white font-kids font-bold text-lg">Empezar a jugar</button>
+  </div>
+</div>
+
+<script>
+// ===== CONEXIÓN INCLUIDA EN LA APP (los pacientes no hacen nada) =====
+const CONFIG = {
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyfRol_PB9Ps9ySw7SpTi2UUJqIScA7IxXSogZkthDkdhehrfNYqeKXuAKcb_-nL5N8/exec',     // dirección /exec del script de Google
+  CLAVE_JUEGO: 'Bambu2026'     // clave de juego (solo permite ENVIAR datos). La clave del fisioterapeuta NO va aquí.
+};
+// ===============================================================
+
+// ---------- Estado ----------
+const EXERCISES = [
+  { key:'dorsi', label:'Dorsiflexión ≥ 15°', goal:15, input:'in-dorsi' },
+  { key:'ever',  label:'Eversión ≥ 10°',     goal:10, input:'in-ever'  },
+  { key:'press', label:'Apoyo ≥ 40 kPa',     goal:40, input:'in-press' }
+];
+const REPS_TARGET = 10;
+const S = { view:'patient', sim:false, noise:false, noiseTimer:null, ex:0, reps:0, stars:0, armed:true,
+            vals:{dorsi:0, ever:0, press:0}, max:{dorsi:0, ever:0, press:0} };
+let sessions = [];            // sesiones del jugador actual (respaldo si no hay servidor)
+let pending = [];             // sesiones aún no enviadas a la base de datos (se guardan también en el navegador)
+try { pending = JSON.parse(localStorage.getItem('hofeet_pending') || '[]'); } catch (e) { pending = []; }
+function savePending(){ try { localStorage.setItem('hofeet_pending', JSON.stringify(pending)); } catch (e) {} }
+const P = { name:'' };
+let flushing = false;
+const CONN = { admin:'' };   // código del fisioterapeuta: solo en memoria, nunca se guarda en el dispositivo
+let chartRom = null, chartPress = null;
+const $ = id => document.getElementById(id);
+
+// ---------- Navegación ----------
+function switchView(v){
+  S.view = v;
+  $('view-patient').classList.toggle('hidden', v !== 'patient');
+  $('view-therapist').classList.toggle('hidden', v !== 'therapist');
+  const on  = ['bg-white','text-bamboo-700','shadow-sm'];
+  const off = ['text-slate-600','hover:text-slate-900'];
+  const p = $('tab-patient'), t = $('tab-therapist');
+  p.classList.remove(...on, ...off); t.classList.remove(...on, ...off);
+  (v==='patient' ? p : t).classList.add(...on);
+  (v==='patient' ? t : p).classList.add(...off);
+  if (v === 'therapist') { renderTherapist(); } else { CONN.admin = ''; cache.rows = []; }
+}
+
+// ---------- Simulador ----------
+function toggleHardwareSim(){
+  S.sim = !S.sim;
+  $('sim-toolbar').classList.toggle('hidden', !S.sim);
+  $('sim-indicator').classList.toggle('bg-bamboo-500', S.sim);
+  $('sim-indicator').classList.toggle('bg-slate-400', !S.sim);
+  if (!S.sim) { $('sim-auto-noise').checked = false; toggleAutoNoise(false); }
+  updateTelemetry();
+}
+function toggleAutoNoise(on){
+  S.noise = on;
+  clearInterval(S.noiseTimer);
+  if (on) S.noiseTimer = setInterval(() => { readSensors(true); updateAll(); }, 120);
+}
+function updateTelemetry(){
+  $('sim-val-dorsi').textContent = S.vals.dorsi.toFixed(0) + '°';
+  $('sim-val-ever').textContent  = S.vals.ever.toFixed(0) + '°';
+  $('sim-val-press').textContent = S.vals.press.toFixed(0) + ' kPa';
+}
+
+// ---------- Sensores ----------
+function readSensors(withNoise){
+  ['dorsi','ever','press'].forEach(k => {
+    const base = +$('in-' + k).value;
+    const max  = +$('in-' + k).max;
+    const n = withNoise ? (Math.random() - 0.5) * 2 : 0;       // ±1 de ruido
+    S.vals[k] = Math.min(max, Math.max(0, base + n));
+    S.max[k]  = Math.max(S.max[k], S.vals[k]);
+  });
+}
+function onSensorInput(){ readSensors(S.noise); updateAll(); }
+
+// ---------- Juego ----------
+function setExercise(i){
+  S.ex = i; S.reps = 0; S.armed = true;
+  S.max = {dorsi:0, ever:0, press:0};
+  $('current-exercise-label').textContent = EXERCISES[i].label;
+  document.querySelectorAll('.ex-btn').forEach(b => {
+    const active = +b.dataset.ex === i;
+    b.className = 'ex-btn px-3 py-1.5 rounded-lg text-xs font-semibold border ' +
+      (active ? 'bg-bamboo-100 text-bamboo-700 border-bamboo-400' : 'border-slate-300 text-slate-600 hover:bg-slate-50');
+  });
+  updateAll();
+}
+function resetSession(){
+  ['in-dorsi','in-ever','in-press'].forEach(id => $(id).value = 0);
+  S.stars = 0; setExercise(S.ex); readSensors(false); updateAll();
+}
+function updateAll(){
+  const ex = EXERCISES[S.ex];
+  const progress = Math.min(1, S.vals[ex.key] / ex.goal);
+
+  $('lbl-dorsi').textContent = S.vals.dorsi.toFixed(0) + '°';
+  $('lbl-ever').textContent  = S.vals.ever.toFixed(0) + '°';
+  $('lbl-press').textContent = S.vals.press.toFixed(0) + ' kPa';
+  $('exercise-progress-bar').style.width = (progress * 100) + '%';
+  $('game-rep-count').textContent = S.reps + ' / ' + REPS_TARGET;
+  $('game-stars').textContent = S.stars;
+  updateTelemetry();
+
+  // El panda avanza hacia el bambú según el progreso
+  const stage = $('game-stage');
+  const run = Math.max(0, stage.clientWidth - 2 * 64 - 144 - 32 - 24);
+  $('panda-character').style.transform = 'translateX(' + (progress * run) + 'px)';
+
+  // Detección de repetición: llegar a la meta y volver a relajar
+  if (progress >= 1 && S.armed) { S.armed = false; countRep(); }
+  else if (progress < 0.2) { S.armed = true; }
+}
+function countRep(){
+  S.reps++; S.stars++;
+  const bubble = $('praise-bubble'), panda = $('panda-emoji');
+  bubble.style.opacity = 1;
+  panda.classList.remove('animate-jump'); void panda.offsetWidth; panda.classList.add('animate-jump');
+  setTimeout(() => bubble.style.opacity = 0, 1200);
+  if (S.reps >= REPS_TARGET) finishSession();
+}
+function finishSession(){
+  const rec = { id:Date.now().toString(36) + Math.random().toString(36).slice(2, 8), patient_name:P.name, exercise:['Dorsiflexión','Eversión','Apoyo'][S.ex], reps:S.reps,
+    max_dorsi:Math.round(S.max.dorsi), max_ever:Math.round(S.max.ever), max_press:Math.round(S.max.press) };
+  const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16).replace('T',' ');
+  sessions.push({ date:local, patient:P.name, ex:rec.exercise, reps:rec.reps, dorsi:rec.max_dorsi, ever:rec.max_ever, press:rec.max_press });
+  pending.push(rec); savePending(); flushPending();
+  const bubble = $('praise-bubble');
+  bubble.textContent = '¡Sesión completa! 🏆'; bubble.style.opacity = 1;
+  setTimeout(() => { bubble.textContent = '¡Excelente movimiento! 🎉'; bubble.style.opacity = 0; }, 2500);
+  S.stars += 5;
+  S.reps = 0; S.armed = false; S.max = {dorsi:0, ever:0, press:0};
+  $('game-stars').textContent = S.stars;
+}
+
+// ---------- Datos de los pacientes (hoja de Google, conexión incluida) ----------
+async function api(action, extra){
+  if (!CONFIG.SCRIPT_URL) { const e = new Error('nourl'); e.code = 'nourl'; throw e; }
+  // Leer datos usa el código del fisioterapeuta; enviar datos usa la clave de juego incluida en la app.
+  const key = action === 'list' ? CONN.admin : CONFIG.CLAVE_JUEGO;
+  const r = await fetch(CONFIG.SCRIPT_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+                               body:JSON.stringify(Object.assign({ action, key:key || '' }, extra)) });
+  const j = await r.json();
+  if (!j.ok) { const e = new Error(j.error || 'error'); e.code = j.error === 'clave' ? 401 : 400; throw e; }
+  return j;
+}
+async function flushPending(){   // reintenta en silencio hasta que lleguen todas las sesiones
+  if (flushing || !pending.length) return;
+  flushing = true;
+  try { while (pending.length) { await api('save', pending[0]); pending.shift(); savePending(); } }
+  catch (e) { /* sin internet o sin configurar: se reintenta luego */ }
+  flushing = false;
+}
+const cache = { rows:[] };
+function therapistLock(show, msg){
+  $('therapist-lock').classList.toggle('hidden', !show);
+  $('therapist-content').classList.toggle('hidden', show);
+  $('lock-error').textContent = msg || '';
+}
+async function unlockTherapist(){
+  const code = $('lock-input').value.trim();
+  if (!code) return;
+  CONN.admin = code; $('lock-input').value = '';
+  renderTherapist();
+}
+async function loadPatients(){
+  try {
+    const j = await api('list');
+    cache.rows = j.rows;
+    const counts = {}; cache.rows.forEach(r => { counts[r.patient] = (counts[r.patient] || 0) + 1; });
+    const names = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+    const dl = $('patient-list'); dl.innerHTML = '';
+    const sel = $('patient-select'); const prev = sel.value; sel.innerHTML = '';
+    const all = document.createElement('option'); all.value = ''; all.textContent = 'Todos los pacientes (' + cache.rows.length + ')'; sel.appendChild(all);
+    names.forEach(n => {
+      const d = document.createElement('option'); d.value = n; dl.appendChild(d);
+      const o = document.createElement('option'); o.value = n; o.textContent = n + ' (' + counts[n] + ')';
+      if (n === prev) o.selected = true;
+      sel.appendChild(o);
+    });
+    return true;
+  } catch (e) {
+    CONN.admin = '';
+    therapistLock(true, e.code === 401 ? 'Código incorrecto.' : e.code === 'nourl' ? 'La app aún no tiene la conexión configurada.' : 'No se pudo conectar. Revisa el internet e inténtalo de nuevo.');
+    return false;
+  }
+}
+function openNameModal(){ $('name-modal').classList.remove('hidden'); $('name-input').value = ''; $('name-input').focus(); }
+function startPlayer(){
+  const name = $('name-input').value.replace(/\s+/g, ' ').trim();
+  $('name-error').classList.toggle('hidden', !!name);
+  if (!name) return;
+  P.name = name; sessions = [];
+  $('patient-name-label').textContent = name;
+  $('name-modal').classList.add('hidden');
+  resetSession();
+}
+
+// ---------- Vista fisioterapeuta ----------
+async function renderTherapist(refresh){
+  if (!CONN.admin) { therapistLock(true); return; }
+  therapistLock(false);
+  if (refresh !== false && !(await loadPatients())) return;
+  const who = $('patient-select').value;
+  let rows = cache.rows;
+  if (who) rows = rows.filter(r => r.patient === who);
+  const last = rows[rows.length - 1];
+  $('kpi-sessions').textContent = rows.length;
+  $('kpi-dorsi').textContent = (last ? last.dorsi : 0) + '°';
+  $('kpi-reps').textContent = rows.reduce((a, s) => a + s.reps, 0);
+
+  const tb = $('session-table'); tb.innerHTML = '';
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="py-4 text-slate-500">Aún no hay sesiones completas.</td></tr>'; }
+  rows.slice().reverse().forEach(s => {
+    const tr = document.createElement('tr'); tr.className = 'border-b border-slate-100';
+    [String(s.date).replace('T', ' ').slice(0, 16), s.patient, s.ex, s.reps, s.dorsi + '°', s.ever + '°', s.press + ' kPa'].forEach((v, i) => {
+      const td = document.createElement('td'); td.className = i === 0 ? 'py-2 pr-4' : 'pr-4'; td.textContent = v; tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+
+  $('charts-wrap').classList.toggle('hidden', !who);   // las gráficas son por paciente
+  if (!who) return;
+  const labels = rows.map((s, i) => 'S' + (i + 1) + ' · ' + String(s.date).slice(5, 10));
+  const romData = { labels, datasets:[
+    { label:'Dorsiflexión', data:rows.map(s => s.dorsi), borderColor:'#16a34a', backgroundColor:'#16a34a', tension:.3 },
+    { label:'Eversión',     data:rows.map(s => s.ever),  borderColor:'#0284c7', backgroundColor:'#0284c7', tension:.3 } ] };
+  const pressData = { labels, datasets:[{ label:'Presión máx. (kPa)', data:rows.map(s => s.press), backgroundColor:'#f59e0b', borderRadius:6 }] };
+  const opts = { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } };
+  if (chartRom) { chartRom.data = romData; chartRom.update(); } else chartRom = new Chart($('chart-rom'), { type:'line', data:romData, options:opts });
+  if (chartPress) { chartPress.data = pressData; chartPress.update(); } else chartPress = new Chart($('chart-press'), { type:'bar', data:pressData, options:opts });
+}
+
+// ---------- Inicio ----------
+window.addEventListener('resize', updateAll);
+window.addEventListener('DOMContentLoaded', () => {
+  setExercise(0); readSensors(false); updateAll();
+  flushPending(); $('name-input').focus();
+  setInterval(flushPending, 10000);
+  window.addEventListener('online', flushPending);
+});
+</script>
+</body>
+</html>
